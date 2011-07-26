@@ -1,0 +1,147 @@
+;----------------------------------------------------------------------
+;                        Buttons Anywhere API
+;                            Version 1.0
+;
+;         Copyright (c) 2001, Synergex International Corporation
+;
+; Source:       button_anywhere.dbl
+;
+; Description:  Allow buttons to be placed anywhere on an input window
+;
+; Limitation:   The button activation character is not supported
+;               The button is not in the tabbing order
+;
+;
+; Author:       Paul Fenton
+;
+; Created:      May, 2001
+;----------------------------------------------------------------------
+.function button_anywhere, ^val, reentrant, stack
+    a_button_id     ,n              ;(Returned) Button id for disable/enable functions
+    a_wndid         ,n              ;Input window id to place buttons on
+    a_row           ,n              ;Placement row relative to input window
+    a_col           ,n              ;Placement col relative to input window
+    a_button_name   ,a              ;Name of button (returned as g_entnam)
+    a_button_type   ,n              ;(Optional) Button Type (Text or bitmap)
+    a_button_data   ,a              ;(optional) Text or bitmap to display on button
+    a_button_method ,a              ;(Optional) Button method
+    a_button_elb    ,a              ;(optional) Button method elb
+
+.include 'WND:tools.def'
+.include 'DBLDIR:windows.def'
+
+record ivar
+    user32          ,i4
+    hparent         ,i4
+    hchild          ,i4
+    hbutton         ,i4
+
+.ifdef DBLV73
+.define M_DLLCALL(hdll, routine, a1, a2, a3, a4, a5, a6) dll_call(hdll, DLL_TYPE_WINAPI, routine, a1, a2, a3, a4, a5, a6)
+.else
+.define M_DLLCALL   dll_subr
+.endc
+
+.proc
+    clear ^i(ivar)
+    onerror exit_with_error
+    ;create window
+    if (.not.a_button_id)                                           ;not already created
+        xcall w_proc(WP_CREATE, a_button_id, '', 1, 1)              ;create general window
+
+    xcall w_brdr(a_button_id, WB_OFF)                               ;turn off its border
+    xcall u_logwnd(a_button_id)                                     ;log it with the toolkit
+
+    ;add standard button
+    xcall b_button(a_button_id, a_button_name, a_button_type, a_button_data,
+    &              a_button_method, a_button_elb)
+    xcall b_enable(a_button_id, a_button_name, FALSE)
+
+    ;resize windows
+    xcall w_proc(WP_SIZE, a_button_id, 70, 23)                      ;resize window as small as possible
+    xcall w_area(a_button_id, WA_ATTR, ATTR_SET+ATTR_RVRS)          ;SHow us if the window is too big
+
+    ;place window
+    user32 = %dll_open("user32")                                    ;slave window with button
+    hparent = %w_info(WIF_HWND, a_wndid)                            ;to input window
+    hchild = %w_info(WIF_HWND, a_button_id)
+    xcall M_DLLCALL(user32, "SetParent", hchild, hparent)
+
+    ;place button
+    xcall u_window(D_PLACE, a_button_id, a_row, a_col)              ;place button relative to input
+                                                                    ;window
+
+    xcall w_updt                                                    ;Force real placement
+    hbutton = %M_DLLCALL(user32, "FindWindowExA", hchild, %integer(0), "BUTTON", %integer(0))
+    xcall M_DLLCALL(user32, "MoveWindow", hbutton, %integer(0), %integer(0),
+    &           %integer(70), %integer(23), %integer(0))
+    xcall dll_close(user32)
+
+    offerror
+    freturn(TRUE)
+
+exit_with_error,
+    offerror
+    freturn(FALSE)
+.end
+
+;----------------------------------------------------------------------
+;test program for buttons anywhere
+.main
+
+.include 'WND:tools.def'
+.include 'DBLDIR:windows.def'
+
+
+record ivar
+    inpBuild        ,i4
+    wndid           ,i4
+    button_id       ,4i4
+
+record avar
+    idata           ,a90
+
+.proc
+    clear ^i(ivar), avar
+    xcall u_start
+
+    ;create input window
+    clear inpBuild
+    xcall ib_input(inpbuild, '', 15, 60)
+    xcall ib_field(inpbuild, 'emp_name', D_FLD_SIZE, 50, D_FLD_TYPE, D_ALPHA,
+    &              D_FLD_POS, 13, 2)
+    xcall ib_field(inpbuild, 'emp_email', D_FLD_SIZE, 40, D_FLD_TYPE, D_ALPHA,
+    &              D_FLD_POS, 15, 2)
+    xcall ib_buttonset(inpbuild, DSB_BOTTOM, 1, DSB_END)
+    xcall ib_button(inpbuild, 'O_EXIT', DSB_TEXT, 'OK')
+    xcall ib_end(inpbuild, wndid)
+    xcall w_brdr(wndid, WB_TITLE, "Test Buttons AnyWhere")
+
+    ;add more buttons anywhere on input window
+    xcall button_anywhere(button_id(1), wndid, 5,10, 'M_BUTTON1', DSB_TEXT, "Button1")
+    xcall button_anywhere(button_id(2), wndid, 6,12, 'M_BUTTON2', DSB_TEXT, "Button2")
+    xcall button_anywhere(button_id(3), wndid, 9,20, 'M_BUTTON3', DSB_TEXT, "Button3")
+    xcall button_anywhere(button_id(4), wndid, 11,15, 'M_BUTTON4', DSB_TEXT, "Button4")
+
+    xcall i_next(wndid,, '*FRST*')
+    xcall u_window(D_PLACE, wndid, 5, 5)
+
+    repeat
+        begin
+        xcall i_input(wndid,, idata,,,, D_NOTERM)
+
+        if (g_select)
+            begin
+            using g_entnam select
+            ('O_EXIT'),
+                exitloop
+            (),
+                xcall u_message('g_entnam='+g_entnam)
+            endusing
+            clear g_select, g_entnam
+            end
+        end
+
+    xcall u_finish
+.end
+

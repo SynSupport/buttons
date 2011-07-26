@@ -1,0 +1,23 @@
+
+                        Buttons Anywhere API
+                            Version 1.0
+
+         Copyright (c) 2001, Synergex International Corporation
+----------------------------------------------------------------------
+
+ Source:	button_anywhere.dbl
+
+ Description:	Allow buttons to be placed anywhere on an input window
+		Minimum SynergyDE version 7
+
+ Limitation:	The button activation character is not supported
+		The button is not in the tabbing order
+
+
+ Author:	Paul Fenton
+		mailto:paul.fenton@synergex.com
+
+ Created:	May, 2001
+
+  
+
